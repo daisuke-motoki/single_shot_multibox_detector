@@ -1,2 +1,2 @@
-# single_shot_multibox_detector
+# Single Shot Multibox Detector
 WIP
