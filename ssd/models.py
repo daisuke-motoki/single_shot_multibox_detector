@@ -1,10 +1,15 @@
-from abc import abstractmethod
+import numpy as np
 from collections import OrderedDict
-from keras.layers import Input, Conv2D, MaxPool2D, AtrousConv2D
+from keras.layers import Input, Conv2D, MaxPool2D
 from keras.layers import Flatten, Reshape, Activation
 from keras.layers.merge import concatenate
 from keras.models import Model
 from ssd.layers import L2Normalization
+from ssd.utils import make_bboxes
+
+
+AVAILABLE_TYPE = ["300"]
+AVAILABLE_BASENET = ["VGG16"]
 
 
 def _build_vgg16_basenet(network):
@@ -107,7 +112,8 @@ def _build_vgg16_basenet(network):
                                        )(network["block5_conv3"])
 
 
-def SSD300(input_shape, n_classes):
+def SSD300(input_shape, n_classes, basenet_name,
+           aspect_ratios, scales, variances):
     """
     """
     n_classes += 1  # add background class
@@ -115,7 +121,14 @@ def SSD300(input_shape, n_classes):
     network["input"] = Input(shape=input_shape)
 
     # base network -------------------------------------------------------
-    _build_vgg16_basenet(network)
+    if basenet_name == "VGG16":
+        _build_vgg16_basenet(network)
+    else:
+        raise NameError(
+            "{} is not defined. Please select from {}".format(
+                basenet_name, AVAILABLE_BASENET
+            )
+        )
 
     # convolution layer 6 (fc6)
     network["block6_conv"] = Conv2D(1024, (3, 3),
@@ -183,21 +196,29 @@ def SSD300(input_shape, n_classes):
     # extra feature layer --------------------------------------------
 
     # classifier -----------------------------------------------------
-    # block4 scale classifier
+    # block4 l2 normalization
     network["block4_norm"] = L2Normalization(20,
                                              name="block4_norm"
                                              )(network["block4_conv3"])
 
-    list_n_boxes = [4, 6, 6, 6, 6, 6]
-    list_aspect_ratios = [[2],
-                          [2, 3],
-                          [2, 3],
-                          [2, 3],
-                          [2, 3],
-                          [2, 3]]
-    classifier_layers = ["block4_norm", "block7_conv", "block8_conv2",
-                         "block9_conv2", "block10_conv2", "block11_conv2"]
-    for n_boxes, layer_name in zip(list_n_boxes, classifier_layers):
+    feature_layers = ["block4_norm", "block7_conv", "block8_conv2",
+                      "block9_conv2", "block10_conv2", "block11_conv2"]
+
+    bboxes = list()
+    for i in range(len(feature_layers)):
+        # make boundary boxes
+        layer_name = feature_layers[i]
+        aspect_ratio = aspect_ratios[i]
+        scale = scales[i]
+        feature_map_shape = network[layer_name]._keras_shape
+        bbox = make_bboxes(input_shape,
+                           feature_map_shape,
+                           aspect_ratio,
+                           scale)
+        bboxes.append(bbox)
+        n_boxes = int(len(bbox)/feature_map_shape[1]/feature_map_shape[2])
+
+        # make classifier layers
         network[layer_name+"_loc"] = Conv2D(n_boxes * 4, (3, 3),
                                             padding="same",
                                             name=layer_name+"_loc"
@@ -215,7 +236,7 @@ def SSD300(input_shape, n_classes):
     # collect predictions
     list_loc_layers = list()
     list_conf_layers = list()
-    for layer_name in classifier_layers:
+    for layer_name in feature_layers:
         list_loc_layers.append(network[layer_name+"_loc_flat"])
         list_conf_layers.append(network[layer_name+"_conf_flat"])
     network["loc"] = concatenate(list_loc_layers,
@@ -240,8 +261,10 @@ def SSD300(input_shape, n_classes):
                                          name="predictions")
     # model
     model = Model(network["input"], network["predictions"])
+    # bbox
+    all_bboxes = np.concatenate(bboxes, axis=0)
 
-    return model
+    return model, all_bboxes
 
 
 def SSD512():
