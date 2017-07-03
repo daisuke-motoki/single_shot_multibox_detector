@@ -66,22 +66,47 @@ class SingleShotMultiBoxDetector:
         self.model = None
         self.bboxes = None
 
-    def build(self):
+    def build(self, init_weight="keras_imagenet"):
         """
         """
+        # create network
         if self.model_type == "ssd300":
-            self.model, self.bboxes = SSD300(self.input_shape,
-                                             self.n_classes,
-                                             self.base_net,
-                                             self.aspect_ratios,
-                                             self.scales,
-                                             self.variances)
+            self.model, priors = SSD300(self.input_shape,
+                                        self.n_classes,
+                                        self.base_net,
+                                        self.aspect_ratios,
+                                        self.scales,
+                                        self.variances)
+            if init_weight is None:
+                pass
+            elif init_weight == "keras_imagenet":
+                from keras.applications import vgg16 as keras_vgg16
+                weights_path = keras_vgg16.get_file(
+                    'vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                    keras_vgg16.WEIGHTS_PATH_NO_TOP,
+                    cache_subdir="models"
+                )
+                self.model.load_weights(weights_path, by_name=True)
+            else:
+                raise NameError(
+                    "{} is not defined.".format(
+                        init_weight
+                    )
+                )
+
         else:
             raise NameError(
                 "{} is not defined. Please select from {}".format(
                     self.model_type, AVAILABLE_TYPE
                 )
             )
+
+        # make boundary box class
+        self.bboxes = BoundaryBox(n_classes=self.n_classes,
+                                  default_boxes=priors,
+                                  overlap_threshold=0.5,
+                                  nms_threshold=0.45,
+                                  max_output_size=400)
 
     def train(self):
         """
@@ -102,4 +127,3 @@ class SingleShotMultiBoxDetector:
         )
         print("Writing parameters into {}.".format(filepath))
         pickle.dump(params, open(filepath, "wb"))
-
