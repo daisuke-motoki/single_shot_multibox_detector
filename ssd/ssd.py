@@ -1,6 +1,9 @@
 import pickle
+import keras
 from ssd.models import AVAILABLE_TYPE
 from ssd.models import SSD300
+from ssd.losses import MultiBoxLoss
+from ssd.utils import BoundaryBox
 
 
 class SingleShotMultiBoxDetector:
@@ -40,10 +43,12 @@ class SingleShotMultiBoxDetector:
 
     def __init__(self, n_classes, input_shape=None, aspect_ratios=None,
                  scales=None, variances=None,
-                 model_type="ssd300", base_net="VGG16"):
+                 overlap_threshold=0.5, nms_threshold=0.45,
+                 max_output_size=400,
+                 model_type="ssd300", base_net="vgg16"):
         """
         """
-        self.n_classes = n_classes
+        self.n_classes = 1 + n_classes  # add background class
         if input_shape:
             self.input_shape = input_shape
         else:
@@ -60,6 +65,9 @@ class SingleShotMultiBoxDetector:
             self.variances = variances
         else:
             self.variances = [0.1, 0.1, 0.2, 0.2]
+        self.overlap_threshold = overlap_threshold
+        self.nms_threshold = nms_threshold
+        self.max_output_size = max_output_size
         self.model_type = model_type
         self.base_net = base_net
 
@@ -75,8 +83,7 @@ class SingleShotMultiBoxDetector:
                                         self.n_classes,
                                         self.base_net,
                                         self.aspect_ratios,
-                                        self.scales,
-                                        self.variances)
+                                        self.scales)
             if init_weight is None:
                 pass
             elif init_weight == "keras_imagenet":
@@ -88,11 +95,7 @@ class SingleShotMultiBoxDetector:
                 )
                 self.model.load_weights(weights_path, by_name=True)
             else:
-                raise NameError(
-                    "{} is not defined.".format(
-                        init_weight
-                    )
-                )
+                self.model.load_weights(init_weight, by_name=True)
 
         else:
             raise NameError(
@@ -104,14 +107,60 @@ class SingleShotMultiBoxDetector:
         # make boundary box class
         self.bboxes = BoundaryBox(n_classes=self.n_classes,
                                   default_boxes=priors,
-                                  overlap_threshold=0.5,
-                                  nms_threshold=0.45,
-                                  max_output_size=400)
+                                  variances=self.variances,
+                                  overlap_threshold=self.overlap_threshold,
+                                  nms_threshold=self.nms_threshold,
+                                  max_output_size=self.max_output_size)
 
-    def train(self):
+    def train_by_generator(self, gen, epoch=30, neg_pos_ratio=3.0,
+                           learning_rate=1e-3, freeze=None, checkpoints=None):
         """
         """
-        pass
+        # set freeze layers
+        if freeze is None:
+            freeze = list()
+
+        for L in self.model.layers:
+            if L.name in freeze:
+                L.trainable = False
+
+        # train setup
+        callbacks = list()
+        if checkpoints:
+            callbacks.append(
+                keras.callbacks.ModelCheckpoint(
+                    checkpoints,
+                    verbose=1,
+                    save_weights_only=True
+                ),
+            )
+
+        # def schedule(epoch, decay=0.9):
+        #     return base_lr * decay**(epoch)
+        # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
+        # optim = keras.optimizers.Adam(lr=learning_rate)
+        optim = keras.optimizers.SGD(
+            lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
+        )
+        self.model.compile(
+            optimizer=optim,
+            loss=MultiBoxLoss(
+                self.n_classes,
+                neg_pos_ratio=neg_pos_ratio
+            ).compute_loss
+        )
+        history = self.model.fit_generator(
+            gen.generate(True),
+            int(gen.train_batches/gen.batch_size),
+            epochs=epoch,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=gen.generate(False),
+            validation_steps=int(gen.val_batches/gen.batch_size),
+            workers=1
+        )
+
+        return history
 
     def save_parameters(self, filepath="./param.pkl"):
         """

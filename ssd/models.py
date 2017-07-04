@@ -9,7 +9,7 @@ from ssd.utils import make_bboxes
 
 
 AVAILABLE_TYPE = ["300"]
-AVAILABLE_BASENET = ["VGG16"]
+AVAILABLE_BASENET = ["vgg16"]
 
 
 def _build_vgg16_basenet(network):
@@ -20,7 +20,7 @@ def _build_vgg16_basenet(network):
                                      activation="relu",
                                      padding="same",
                                      name="block1_conv1"
-                                     )(network["input"])
+                                     )(network["input_1"])
     network["block1_conv2"] = Conv2D(64, (3, 3),
                                      activation="relu",
                                      padding="same",
@@ -113,15 +113,14 @@ def _build_vgg16_basenet(network):
 
 
 def SSD300(input_shape, n_classes, basenet_name,
-           aspect_ratios, scales, variances):
+           aspect_ratios, scales):
     """
     """
-    n_classes += 1  # add background class
     network = OrderedDict()
-    network["input"] = Input(shape=input_shape)
+    network["input_1"] = Input(shape=input_shape)
 
     # base network -------------------------------------------------------
-    if basenet_name == "VGG16":
+    if basenet_name == "vgg16":
         _build_vgg16_basenet(network)
     else:
         raise NameError(
@@ -205,6 +204,8 @@ def SSD300(input_shape, n_classes, basenet_name,
                       "block9_conv2", "block10_conv2", "block11_conv2"]
 
     bboxes = list()
+    list_loc_layers = list()
+    list_conf_layers = list()
     for i in range(len(feature_layers)):
         # make boundary boxes
         layer_name = feature_layers[i]
@@ -219,26 +220,25 @@ def SSD300(input_shape, n_classes, basenet_name,
         n_boxes = int(len(bbox)/feature_map_shape[1]/feature_map_shape[2])
 
         # make classifier layers
-        network[layer_name+"_loc"] = Conv2D(n_boxes * 4, (3, 3),
-                                            padding="same",
-                                            name=layer_name+"_loc"
-                                            )(network[layer_name])
-        network[layer_name+"_loc_flat"] = Flatten(
-            name=layer_name+"_loc_flat")(network[layer_name+"_loc"])
-        network[layer_name+"_conf"] = Conv2D(n_boxes * n_classes, (3, 3),
-                                             padding="same",
-                                             name=layer_name+"_conf"
-                                             )(network[layer_name])
-        network[layer_name+"_conf_flat"] = Flatten(
-            name=layer_name+"_conf_flat")(network[layer_name+"_conf"])
+        layer_name_n = layer_name + "_{}".format(n_classes)
+        network[layer_name_n+"_loc"] = Conv2D(n_boxes * 4, (3, 3),
+                                              padding="same",
+                                              name=layer_name_n+"_loc"
+                                              )(network[layer_name])
+        network[layer_name_n+"_loc_flat"] = Flatten(
+            name=layer_name_n+"_loc_flat")(network[layer_name_n+"_loc"])
+        network[layer_name_n+"_conf"] = Conv2D(n_boxes * n_classes, (3, 3),
+                                               padding="same",
+                                               name=layer_name_n+"_conf"
+                                               )(network[layer_name])
+        network[layer_name_n+"_conf_flat"] = Flatten(
+            name=layer_name_n+"_conf_flat")(network[layer_name_n+"_conf"])
+
+        list_loc_layers.append(network[layer_name_n+"_loc_flat"])
+        list_conf_layers.append(network[layer_name_n+"_conf_flat"])
     # classifier -----------------------------------------------------
 
     # collect predictions
-    list_loc_layers = list()
-    list_conf_layers = list()
-    for layer_name in feature_layers:
-        list_loc_layers.append(network[layer_name+"_loc_flat"])
-        list_conf_layers.append(network[layer_name+"_conf_flat"])
     network["loc"] = concatenate(list_loc_layers,
                                  axis=1,
                                  name="loc")
@@ -260,7 +260,7 @@ def SSD300(input_shape, n_classes, basenet_name,
                                          axis=2,
                                          name="predictions")
     # model
-    model = Model(network["input"], network["predictions"])
+    model = Model(network["input_1"], network["predictions"])
     # bbox
     all_bboxes = np.concatenate(bboxes, axis=0)
 
