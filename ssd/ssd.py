@@ -1,7 +1,7 @@
 import pickle
 import keras
 from ssd.models import AVAILABLE_TYPE
-from ssd.models import SSD300
+from ssd.models import SSD300, SSD512
 from ssd.losses import MultiBoxLoss
 from ssd.utils import BoundaryBox
 
@@ -84,25 +84,41 @@ class SingleShotMultiBoxDetector:
                                         self.base_net,
                                         self.aspect_ratios,
                                         self.scales)
-            if init_weight is None:
-                pass
-            elif init_weight == "keras_imagenet":
-                from keras.applications import vgg16 as keras_vgg16
-                weights_path = keras_vgg16.get_file(
-                    'vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-                    keras_vgg16.WEIGHTS_PATH_NO_TOP,
-                    cache_subdir="models"
-                )
-                self.model.load_weights(weights_path, by_name=True)
-            else:
-                self.model.load_weights(init_weight, by_name=True)
-
+        elif self.model_type == "ssd512":
+            self.model, priors = SSD512(self.input_shape,
+                                        self.n_classes,
+                                        self.base_net,
+                                        self.aspect_ratios,
+                                        self.scales)
         else:
             raise NameError(
                 "{} is not defined. Please select from {}".format(
                     self.model_type, AVAILABLE_TYPE
                 )
             )
+
+        if init_weight is None:
+            print("Network has not initialized with any pretrained models.")
+        elif init_weight == "keras_imagenet":
+            print("Initializing network with keras application model"
+                  " pretrained imagenet.")
+            if self.base_net == "vgg16":
+                import keras.applications.vgg16 as keras_vgg16
+                weights_path = keras_vgg16.get_file(
+                    'vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                    keras_vgg16.WEIGHTS_PATH_NO_TOP,
+                    cache_subdir="models"
+                )
+            else:
+                raise NameError(
+                    "{} is not defined.".format(
+                        self.base_net
+                    )
+                )
+            self.model.load_weights(weights_path, by_name=True)
+        else:
+            print("Initializing network from file {}.".format(init_weight))
+            self.model.load_weights(init_weight, by_name=True)
 
         # make boundary box class
         self.bboxes = BoundaryBox(n_classes=self.n_classes,
@@ -135,13 +151,13 @@ class SingleShotMultiBoxDetector:
                 ),
             )
 
-        # def schedule(epoch, decay=0.9):
-        #     return base_lr * decay**(epoch)
-        # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
-        # optim = keras.optimizers.Adam(lr=learning_rate)
-        optim = keras.optimizers.SGD(
-            lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
-        )
+        def schedule(epoch, decay=0.9):
+            return learning_rate * decay**(epoch)
+        callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
+        optim = keras.optimizers.Adam(lr=learning_rate)
+        # optim = keras.optimizers.SGD(
+        #     lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
+        # )
         self.model.compile(
             optimizer=optim,
             loss=MultiBoxLoss(
