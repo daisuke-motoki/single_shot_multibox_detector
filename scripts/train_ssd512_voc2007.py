@@ -16,7 +16,7 @@ if __name__ == "__main__":
               "pottedplant", "person",
               "sheep", "sofa",
               "train", "tvmonitor"]
-    n_classes = len(labels)
+    n_classes = len(labels) + 1  # add BG
     input_shape = (512, 512, 3)
     aspect_ratios = [[2., 1/2.],
                      [2., 1/2., 3., 1/3.],
@@ -88,4 +88,4 @@ if __name__ == "__main__":
                            neg_pos_ratio=3.0,
                            freeze=freeze,
                            checkpoints=path_to_checkpoints)
-    ssd.save_parameters("ssd512_voc2007_params.pkl")
+    ssd.save_parameters("ssd512_voc2007_params.json")

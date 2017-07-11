@@ -16,6 +16,8 @@ class MultiBoxLoss:
         """
         """
         softmax_loss = categorical_crossentropy(y_true, y_pred)
+        # y_pred = tf.maximum(tf.minimum(y_pred, 1 - 1e-15), 1e-15)
+        # softmax_loss = -tf.reduce_sum(y_true * tf.log(y_pred), axis=-1)
         return softmax_loss
 
     def _l1_smooth_loss(self, y_true, y_pred):

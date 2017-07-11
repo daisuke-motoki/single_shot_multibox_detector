@@ -1,4 +1,4 @@
-import pickle
+import json
 import keras
 from ssd.models import AVAILABLE_TYPE
 from ssd.models import SSD300, SSD512
@@ -16,12 +16,6 @@ class SingleShotMultiBoxDetector:
                 [2., 1/2., 3., 1/3.],
                 [2., 1/2.],
                 [2., 1/2.]]
-        # ssd300=[[2., 1/2.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.]]
     )
     scale_presets = dict(
         ssd300=[(30., 60.),
@@ -30,25 +24,19 @@ class SingleShotMultiBoxDetector:
                 (162., 213.),
                 (213., 264.),
                 (264., 315.)]
-        # ssd300=[(30.),
-        #         (60., 111.),
-        #         (111., 162.),
-        #         (162., 213.),
-        #         (213., 264.),
-        #         (264., 315.)]
     )
     default_shapes = dict(
         ssd300=(300, 300, 3)
     )
 
-    def __init__(self, n_classes, input_shape=None, aspect_ratios=None,
+    def __init__(self, n_classes=1, input_shape=None, aspect_ratios=None,
                  scales=None, variances=None,
                  overlap_threshold=0.5, nms_threshold=0.45,
                  max_output_size=400,
                  model_type="ssd300", base_net="vgg16"):
         """
         """
-        self.n_classes = 1 + n_classes  # add background class
+        self.n_classes = n_classes
         if input_shape:
             self.input_shape = input_shape
         else:
@@ -151,9 +139,9 @@ class SingleShotMultiBoxDetector:
                 ),
             )
 
-        def schedule(epoch, decay=0.9):
-            return learning_rate * decay**(epoch)
-        callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
+        # def schedule(epoch, decay=0.9):
+        #     return learning_rate * decay**(epoch)
+        # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
         optim = keras.optimizers.Adam(lr=learning_rate)
         # optim = keras.optimizers.SGD(
         #     lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
@@ -178,7 +166,7 @@ class SingleShotMultiBoxDetector:
 
         return history
 
-    def save_parameters(self, filepath="./param.pkl"):
+    def save_parameters(self, filepath="./param.json"):
         """
         """
         params = dict(
@@ -191,4 +179,17 @@ class SingleShotMultiBoxDetector:
             variances=self.variances
         )
         print("Writing parameters into {}.".format(filepath))
-        pickle.dump(params, open(filepath, "wb"))
+        json.dump(params, open(filepath, "w"), indent=4, sort_keys=True)
+
+    def load_parameters(self, filepath):
+        """
+        """
+        print("Loading parameters from {}.".format(filepath))
+        params = json.load(open(filepath, "r"))
+        self.n_classes = params["n_classes"]
+        self.input_shape = params["input_shape"]
+        self.model_type = params["model_type"]
+        self.base_net = params["base_net"]
+        self.aspect_ratios = params["aspect_ratios"]
+        self.scales = params["scales"]
+        self.variances = params["variances"]

@@ -149,7 +149,9 @@ class Generator(object):
             targets = []
             for key in keys:
                 img_path = self.path_prefix + key
-                if os.path.exists(img_path + ".jpg"):
+                if os.path.exists(img_path):
+                    pass
+                elif os.path.exists(img_path + ".jpg"):
                     img_path = img_path + ".jpg"
                 elif os.path.exists(img_path + ".JPG"):
                     img_path = img_path + ".JPG"
@@ -170,7 +172,7 @@ class Generator(object):
                     if self.lighting_std:
                         img = self.lighting(img)
                     if self.hflip_prob > 0:
-                        img, y = self.horizontal_flip(img, y)
+                        img_tmp, y_tmp = self.horizontal_flip(img, y)
                     if self.vflip_prob > 0:
                         img, y = self.vertical_flip(img, y)
                 y = self.bbox_util.assign_boxes(y)

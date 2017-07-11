@@ -27,7 +27,8 @@ def make_bboxes(input_shape, feature_map_shape,
     # feature grids
     step_w = input_w / map_w
     step_h = input_h / map_h
-    center_w, center_h = np.mgrid[0:map_w, 0:map_h] + 0.5
+    center_h, center_w = np.mgrid[0:map_w, 0:map_h] + 0.5
+    # swap h and w due to after reshapes
     center_w = (center_w * step_w/input_w).reshape(-1, 1)
     center_h = (center_h * step_h/input_h).reshape(-1, 1)
 
@@ -120,10 +121,10 @@ class BoundaryBox:
         encoded_box[:, :2][assign_mask] = \
             box_center - assigned_default_boxes_center
         encoded_box[:, :2][assign_mask] /= assigned_default_boxes_wh
-        encoded_box[:, :2][assign_mask] /= self.variances[:2]
+        encoded_box[:, :2][assign_mask] /= np.array([self.variances[:2]])
         encoded_box[:, 2:4][assign_mask] = np.log(box_wh /
                                                   assigned_default_boxes_wh)
-        encoded_box[:, 2:4][assign_mask] /= self.variances[2:]
+        encoded_box[:, 2:4][assign_mask] /= np.array([self.variances[2:]])
         return encoded_box
 
     def assign_boxes(self, boxes):
@@ -213,7 +214,7 @@ class BoundaryBox:
         results = []
         for i in range(len(mbox_loc)):
             results.append([])
-            decode_bbox = self.decode_boxes(mbox_loc[i])
+            decode_bbox = self.decode(mbox_loc[i])
             for c in range(self.n_classes):
                 if c == background_label_id:
                     continue

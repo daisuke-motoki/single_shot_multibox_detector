@@ -338,8 +338,7 @@ def SSD300(input_shape, n_classes, basenet_name,
     # model
     model = Model(network["input"], network["predictions"])
     # bbox
-    all_bboxes = np.concatenate(bboxes, axis=0)
-
+    all_bboxes = np.concatenate(bboxes, axis=0).astype("float32")
     return model, all_bboxes
 
 
@@ -506,6 +505,6 @@ def SSD512(input_shape, n_classes, basenet_name,
     # model
     model = Model(network["input"], network["predictions"])
     # bbox
-    all_bboxes = np.concatenate(bboxes, axis=0)
+    all_bboxes = np.concatenate(bboxes, axis=0).astype("float32")
 
     return model, all_bboxes

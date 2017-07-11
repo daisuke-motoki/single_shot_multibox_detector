@@ -16,7 +16,7 @@ if __name__ == "__main__":
               "pottedplant", "person",
               "sheep", "sofa",
               "train", "tvmonitor"]
-    n_classes = len(labels)
+    n_classes = len(labels) + 1  # add BG
     input_shape = (300, 300, 3)
 
     # ssd keras conditions
@@ -49,9 +49,9 @@ if __name__ == "__main__":
     ssd.build()
 
     # make generator for training images
-    batch_size = 8
+    batch_size = 32
     GROUND_TRUTH = "voc2007_annotations.pkl"
-    INPUT_DATA = "../../../share/image-net/VOCdevkit/VOC2007/JPEGImages"
+    INPUT_DATA = "../../../share/image-net/VOCdevkit/VOC2007/JPEGImages/"
     gt = pickle.load(open(GROUND_TRUTH, 'rb'))
     keys = sorted(gt.keys())
     indexes = np.arange(len(keys))
@@ -80,12 +80,12 @@ if __name__ == "__main__":
     freeze = ["input_1",
               "block1_conv1", "block1_conv2", "block1_pool",
               "block2_conv1", "block2_conv2", "block2_pool",
-              # "block3_conv1", "block3_conv2", "block3_conv3", "block3_pool",
+              "block3_conv1", "block3_conv2", "block3_conv3", "block3_pool",
               ]
+    ssd.save_parameters("./checkpoints/ssd300_voc2007_params.json")
     ssd.train_by_generator(gen,
                            epoch=30,
-                           learning_rate=3e-4,
-                           neg_pos_ratio=2.0,
+                           learning_rate=1e-3,
+                           neg_pos_ratio=3.0,
                            freeze=freeze,
                            checkpoints=path_to_checkpoints)
-    ssd.save_parameters("ssd300_voc2007_params.pkl")
