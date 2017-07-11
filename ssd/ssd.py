@@ -1,6 +1,9 @@
-import pickle
+import json
+import keras
 from ssd.models import AVAILABLE_TYPE
-from ssd.models import SSD300
+from ssd.models import SSD300, SSD512
+from ssd.losses import MultiBoxLoss
+from ssd.utils import BoundaryBox
 
 
 class SingleShotMultiBoxDetector:
@@ -13,12 +16,6 @@ class SingleShotMultiBoxDetector:
                 [2., 1/2., 3., 1/3.],
                 [2., 1/2.],
                 [2., 1/2.]]
-        # ssd300=[[2., 1/2.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.],
-        #         [2., 1/2., 3., 1/3.]]
     )
     scale_presets = dict(
         ssd300=[(30., 60.),
@@ -27,20 +24,16 @@ class SingleShotMultiBoxDetector:
                 (162., 213.),
                 (213., 264.),
                 (264., 315.)]
-        # ssd300=[(30.),
-        #         (60., 111.),
-        #         (111., 162.),
-        #         (162., 213.),
-        #         (213., 264.),
-        #         (264., 315.)]
     )
     default_shapes = dict(
         ssd300=(300, 300, 3)
     )
 
-    def __init__(self, n_classes, input_shape=None, aspect_ratios=None,
+    def __init__(self, n_classes=1, input_shape=None, aspect_ratios=None,
                  scales=None, variances=None,
-                 model_type="ssd300", base_net="VGG16"):
+                 overlap_threshold=0.5, nms_threshold=0.45,
+                 max_output_size=400,
+                 model_type="ssd300", base_net="vgg16"):
         """
         """
         self.n_classes = n_classes
@@ -60,6 +53,9 @@ class SingleShotMultiBoxDetector:
             self.variances = variances
         else:
             self.variances = [0.1, 0.1, 0.2, 0.2]
+        self.overlap_threshold = overlap_threshold
+        self.nms_threshold = nms_threshold
+        self.max_output_size = max_output_size
         self.model_type = model_type
         self.base_net = base_net
 
@@ -75,25 +71,13 @@ class SingleShotMultiBoxDetector:
                                         self.n_classes,
                                         self.base_net,
                                         self.aspect_ratios,
-                                        self.scales,
-                                        self.variances)
-            if init_weight is None:
-                pass
-            elif init_weight == "keras_imagenet":
-                from keras.applications import vgg16 as keras_vgg16
-                weights_path = keras_vgg16.get_file(
-                    'vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-                    keras_vgg16.WEIGHTS_PATH_NO_TOP,
-                    cache_subdir="models"
-                )
-                self.model.load_weights(weights_path, by_name=True)
-            else:
-                raise NameError(
-                    "{} is not defined.".format(
-                        init_weight
-                    )
-                )
-
+                                        self.scales)
+        elif self.model_type == "ssd512":
+            self.model, priors = SSD512(self.input_shape,
+                                        self.n_classes,
+                                        self.base_net,
+                                        self.aspect_ratios,
+                                        self.scales)
         else:
             raise NameError(
                 "{} is not defined. Please select from {}".format(
@@ -101,19 +85,88 @@ class SingleShotMultiBoxDetector:
                 )
             )
 
+        if init_weight is None:
+            print("Network has not initialized with any pretrained models.")
+        elif init_weight == "keras_imagenet":
+            print("Initializing network with keras application model"
+                  " pretrained imagenet.")
+            if self.base_net == "vgg16":
+                import keras.applications.vgg16 as keras_vgg16
+                weights_path = keras_vgg16.get_file(
+                    'vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                    keras_vgg16.WEIGHTS_PATH_NO_TOP,
+                    cache_subdir="models"
+                )
+            else:
+                raise NameError(
+                    "{} is not defined.".format(
+                        self.base_net
+                    )
+                )
+            self.model.load_weights(weights_path, by_name=True)
+        else:
+            print("Initializing network from file {}.".format(init_weight))
+            self.model.load_weights(init_weight, by_name=True)
+
         # make boundary box class
         self.bboxes = BoundaryBox(n_classes=self.n_classes,
                                   default_boxes=priors,
-                                  overlap_threshold=0.5,
-                                  nms_threshold=0.45,
-                                  max_output_size=400)
+                                  variances=self.variances,
+                                  overlap_threshold=self.overlap_threshold,
+                                  nms_threshold=self.nms_threshold,
+                                  max_output_size=self.max_output_size)
 
-    def train(self):
+    def train_by_generator(self, gen, epoch=30, neg_pos_ratio=3.0,
+                           learning_rate=1e-3, freeze=None, checkpoints=None):
         """
         """
-        pass
+        # set freeze layers
+        if freeze is None:
+            freeze = list()
 
-    def save_parameters(self, filepath="./param.pkl"):
+        for L in self.model.layers:
+            if L.name in freeze:
+                L.trainable = False
+
+        # train setup
+        callbacks = list()
+        if checkpoints:
+            callbacks.append(
+                keras.callbacks.ModelCheckpoint(
+                    checkpoints,
+                    verbose=1,
+                    save_weights_only=True
+                ),
+            )
+
+        # def schedule(epoch, decay=0.9):
+        #     return learning_rate * decay**(epoch)
+        # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
+        optim = keras.optimizers.Adam(lr=learning_rate)
+        # optim = keras.optimizers.SGD(
+        #     lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
+        # )
+        self.model.compile(
+            optimizer=optim,
+            loss=MultiBoxLoss(
+                self.n_classes,
+                neg_pos_ratio=neg_pos_ratio
+            ).compute_loss
+        )
+        history = self.model.fit_generator(
+            gen.generate(True),
+            int(gen.train_batches/gen.batch_size),
+            epochs=epoch,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=gen.generate(False),
+            validation_steps=int(gen.val_batches/gen.batch_size),
+            workers=1
+        )
+
+        return history
+
+    def save_parameters(self, filepath="./param.json"):
         """
         """
         params = dict(
@@ -126,4 +179,17 @@ class SingleShotMultiBoxDetector:
             variances=self.variances
         )
         print("Writing parameters into {}.".format(filepath))
-        pickle.dump(params, open(filepath, "wb"))
+        json.dump(params, open(filepath, "w"), indent=4, sort_keys=True)
+
+    def load_parameters(self, filepath):
+        """
+        """
+        print("Loading parameters from {}.".format(filepath))
+        params = json.load(open(filepath, "r"))
+        self.n_classes = params["n_classes"]
+        self.input_shape = params["input_shape"]
+        self.model_type = params["model_type"]
+        self.base_net = params["base_net"]
+        self.aspect_ratios = params["aspect_ratios"]
+        self.scales = params["scales"]
+        self.variances = params["variances"]
