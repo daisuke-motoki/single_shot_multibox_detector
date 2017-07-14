@@ -1,5 +1,6 @@
 import json
 import keras
+from keras.applications.imagenet_utils import preprocess_input
 from ssd.models import AVAILABLE_TYPE
 from ssd.models import SSD300, SSD512
 from ssd.losses import MultiBoxLoss
@@ -15,6 +16,13 @@ class SingleShotMultiBoxDetector:
                 [2., 1/2., 3., 1/3.],
                 [2., 1/2., 3., 1/3.],
                 [2., 1/2.],
+                [2., 1/2.]],
+        ssd512=[[2., 1/2.],
+                [2., 1/2., 3., 1/3.],
+                [2., 1/2., 3., 1/3.],
+                [2., 1/2., 3., 1/3.],
+                [2., 1/2., 3., 1/3.],
+                [2., 1/2.],
                 [2., 1/2.]]
     )
     scale_presets = dict(
@@ -23,20 +31,33 @@ class SingleShotMultiBoxDetector:
                 (111., 162.),
                 (162., 213.),
                 (213., 264.),
-                (264., 315.)]
+                (264., 315.)],
+        ssd512=[(20.48, 51.2),
+                (51.2, 133.12),
+                (133.12, 215.04),
+                (215.04, 296.96),
+                (296.96, 378.88),
+                (378.88, 460.8),
+                (460.8, 542.72)]
     )
     default_shapes = dict(
         ssd300=(300, 300, 3)
     )
 
-    def __init__(self, n_classes=1, input_shape=None, aspect_ratios=None,
-                 scales=None, variances=None,
+    def __init__(self, n_classes=1, class_names=["bg"], input_shape=None,
+                 aspect_ratios=None, scales=None, variances=None,
                  overlap_threshold=0.5, nms_threshold=0.45,
                  max_output_size=400,
                  model_type="ssd300", base_net="vgg16"):
         """
         """
         self.n_classes = n_classes
+        self.class_names = class_names
+        if "bg" != class_names[0]:
+            print("Warning: Fist label should be bg."
+                  " It'll be added automatically.")
+            self.class_names = ["bg"] + class_names
+            self.n_classes += 1
         if input_shape:
             self.input_shape = input_shape
         else:
@@ -117,7 +138,8 @@ class SingleShotMultiBoxDetector:
                                   max_output_size=self.max_output_size)
 
     def train_by_generator(self, gen, epoch=30, neg_pos_ratio=3.0,
-                           learning_rate=1e-3, freeze=None, checkpoints=None):
+                           learning_rate=1e-3, freeze=None, checkpoints=None,
+                           optimizer=None):
         """
         """
         # set freeze layers
@@ -142,10 +164,15 @@ class SingleShotMultiBoxDetector:
         # def schedule(epoch, decay=0.9):
         #     return learning_rate * decay**(epoch)
         # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
-        optim = keras.optimizers.Adam(lr=learning_rate)
         # optim = keras.optimizers.SGD(
         #     lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
         # )
+
+        if optimizer is None:
+            optim = keras.optimizers.Adam(lr=learning_rate)
+        else:
+            optim = optimizer
+
         self.model.compile(
             optimizer=optim,
             loss=MultiBoxLoss(
@@ -171,6 +198,7 @@ class SingleShotMultiBoxDetector:
         """
         params = dict(
             n_classes=self.n_classes,
+            class_names=self.class_names,
             input_shape=self.input_shape,
             model_type=self.model_type,
             base_net=self.base_net,
@@ -187,9 +215,29 @@ class SingleShotMultiBoxDetector:
         print("Loading parameters from {}.".format(filepath))
         params = json.load(open(filepath, "r"))
         self.n_classes = params["n_classes"]
+        self.class_names = params["class_names"]
         self.input_shape = params["input_shape"]
         self.model_type = params["model_type"]
         self.base_net = params["base_net"]
         self.aspect_ratios = params["aspect_ratios"]
         self.scales = params["scales"]
         self.variances = params["variances"]
+
+    def detect(self, X, batch_size=1, verbose=0,
+               keep_top_k=200, confidence_threshold=0.01,
+               do_preprocess=True):
+        """
+        """
+        if do_preprocess:
+            X = preprocess_input(X)
+
+        predictions = self.model.predict(X,
+                                         batch_size=batch_size,
+                                         verbose=verbose)
+        detections = self.bboxes.detection_out(
+            predictions,
+            keep_top_k=keep_top_k,
+            confidence_threshold=confidence_threshold
+        )
+
+        return detections

@@ -7,7 +7,8 @@ from generator import Generator
 
 if __name__ == "__main__":
     # settings
-    labels = ["aeroplane",
+    labels = ["bg",
+              "aeroplane",
               "bus", "bicycle", "bird", "boat", "bottle",
               "car", "cat", "chair", "cow",
               "diningtable", "dog",
@@ -16,7 +17,7 @@ if __name__ == "__main__":
               "pottedplant", "person",
               "sheep", "sofa",
               "train", "tvmonitor"]
-    n_classes = len(labels) + 1  # add BG
+    n_classes = len(labels)
     input_shape = (512, 512, 3)
     aspect_ratios = [[2., 1/2.],
                      [2., 1/2., 3., 1/3.],

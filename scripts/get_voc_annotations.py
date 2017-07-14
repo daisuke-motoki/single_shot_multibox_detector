@@ -1,5 +1,5 @@
 import pickle
-from ssd.annotations import VOCAnnotationReader
+from ssd.utils import VOCAnnotationReader
 
 
 if __name__ == "__main__":

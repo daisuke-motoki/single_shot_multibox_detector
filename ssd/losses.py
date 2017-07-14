@@ -34,20 +34,20 @@ class MultiBoxLoss:
         batch_size = tf.shape(y_true)[0]
         num_boxes = tf.to_float(tf.shape(y_true)[1])
 
-        # loss for all priors
+        # loss for all default boxes
         conf_loss = self._softmax_loss(y_true[:, :, 4:],
                                        y_pred[:, :, 4:])
         loc_loss = self._l1_smooth_loss(y_true[:, :, :4],
                                         y_pred[:, :, :4])
 
-        # get positives loss
+        # positives loss
         num_pos = num_boxes - tf.reduce_sum(y_true[:, :, 4], axis=-1)
         pos_loc_loss = tf.reduce_sum(loc_loss * (1 - y_true[:, :, 4]),
                                      axis=1)
         pos_conf_loss = tf.reduce_sum(conf_loss * (1 - y_true[:, :, 4]),
                                       axis=1)
 
-        # get negatives loss, we penalize only confidence here
+        # negatives loss
         num_neg = tf.minimum(self.neg_pos_ratio * num_pos,
                              num_boxes - num_pos)
         pos_num_neg_mask = tf.greater(num_neg, 0)
@@ -62,6 +62,7 @@ class MultiBoxLoss:
         confs_end = confs_start + self.n_classes - 1
         max_confs = tf.reduce_max(y_pred[:, :, confs_start:confs_end],
                                   axis=2)
+
         _, indices = tf.nn.top_k(max_confs * y_true[:, :, 4],
                                  k=num_neg_batch)
         batch_idx = tf.expand_dims(tf.range(0, batch_size), 1)
