@@ -1,5 +1,7 @@
-import numpy as np
+import os
 import tensorflow as tf
+import numpy as np
+from xml.etree import ElementTree
 
 
 def make_bboxes(input_shape, feature_map_shape,
@@ -192,14 +194,13 @@ class BoundaryBox:
         decode_bbox = np.minimum(np.maximum(decode_bbox, 0.0), 1.0)
         return decode_bbox
 
-    def detection_out(self, predictions, background_label_id=0, keep_top_k=200,
+    def detection_out(self, predictions, keep_top_k=200,
                       confidence_threshold=0.01):
         """Do non maximum suppression (nms) on prediction results.
 
         # Arguments
             predictions: Numpy array of predicted values.
             num_classes: Number of classes for prediction.
-            background_label_id: Label of background class.
             keep_top_k: Number of total bboxes to be kept per image
                 after nms step.
             confidence_threshold: Only consider detections,
@@ -216,7 +217,7 @@ class BoundaryBox:
             results.append([])
             decode_bbox = self.decode(mbox_loc[i])
             for c in range(self.n_classes):
-                if c == background_label_id:
+                if c == 0:
                     continue
                 c_confs = mbox_conf[i, :, c]
                 c_confs_m = c_confs > confidence_threshold
@@ -238,3 +239,52 @@ class BoundaryBox:
                 results[-1] = results[-1][argsort]
                 results[-1] = results[-1][:keep_top_k]
         return results
+
+
+class VOCAnnotationReader(object):
+
+    def __init__(self, data_path, label_names):
+        self.path_prefix = data_path
+        self.label_names = label_names
+        self.num_classes = len(label_names)
+        self.data = dict()
+        self._read_xml()
+
+    def _read_xml(self):
+        filenames = os.listdir(self.path_prefix)
+        for filename in filenames:
+            tree = ElementTree.parse(os.sep.join((
+                self.path_prefix, filename
+            )))
+            root = tree.getroot()
+            bounding_boxes = []
+            one_hot_classes = []
+            size_tree = root.find('size')
+            width = float(size_tree.find('width').text)
+            height = float(size_tree.find('height').text)
+            for object_tree in root.findall('object'):
+                for bounding_box in object_tree.iter('bndbox'):
+                    xmin = float(bounding_box.find('xmin').text)/width
+                    ymin = float(bounding_box.find('ymin').text)/height
+                    xmax = float(bounding_box.find('xmax').text)/width
+                    ymax = float(bounding_box.find('ymax').text)/height
+                bounding_box = [xmin, ymin, xmax, ymax]
+                bounding_boxes.append(bounding_box)
+                class_name = object_tree.find('name').text
+                one_hot_class = self._to_one_hot(class_name)
+                one_hot_classes.append(one_hot_class)
+            image_name = root.find('filename').text
+            bounding_boxes = np.asarray(bounding_boxes)
+            one_hot_classes = np.asarray(one_hot_classes)
+            image_data = np.hstack((bounding_boxes, one_hot_classes))
+            self.data[image_name] = image_data
+
+    def _to_one_hot(self, name):
+        one_hot_vector = [0] * self.num_classes
+        if name in self.label_names:
+            index = self.label_names.index(name)
+            one_hot_vector[index] = 1
+        else:
+            print('unknown label: %s' % name)
+
+        return one_hot_vector

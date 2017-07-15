@@ -196,6 +196,16 @@ def SSD300(input_shape, n_classes, basenet_name,
     # base network -------------------------------------------------------
     if basenet_name == "vgg16":
         _build_vgg16_basenet(network)
+        feature_layers = ["block4_norm", "block7_conv", "block8_conv2",
+                          "block9_conv2", "block10_conv2", "block11_conv2"]
+    elif basenet_name == "resnet50":
+        _build_resnet50_basenet(network)
+        feature_layers = []
+        raise NameError(
+            "{} is not defined. Please select from {}".format(
+                basenet_name, AVAILABLE_BASENET
+            )
+        )
     else:
         raise NameError(
             "{} is not defined. Please select from {}".format(
@@ -216,7 +226,6 @@ def SSD300(input_shape, n_classes, basenet_name,
                                     padding="same",
                                     name="block7_conv"
                                     )(network["block6_conv"])
-
     # extra feature layer ---------------------------------------------
     # convolution layer 8
     network["block8_conv1"] = Conv2D(256, (1, 1),
@@ -275,10 +284,6 @@ def SSD300(input_shape, n_classes, basenet_name,
     network["block4_norm"] = L2Normalization(20,
                                              name="block4_norm"
                                              )(network["block4_conv3"])
-
-    feature_layers = ["block4_norm", "block7_conv", "block8_conv2",
-                      "block9_conv2", "block10_conv2", "block11_conv2"]
-
     bboxes = list()
     list_loc_layers = list()
     list_conf_layers = list()
@@ -352,6 +357,17 @@ def SSD512(input_shape, n_classes, basenet_name,
     # base network -------------------------------------------------------
     if basenet_name == "vgg16":
         _build_vgg16_basenet(network)
+        feature_layers = ["block4_norm", "block7_conv", "block8_conv2",
+                          "block9_conv2", "block10_conv2", "block11_conv2",
+                          "block12_conv2"]
+    elif basenet_name == "resnet50":
+        _build_resnet50_basenet(network)
+        feature_layers = []
+        raise NameError(
+            "{} is not defined. Please select from {}".format(
+                basenet_name, AVAILABLE_BASENET
+            )
+        )
     else:
         raise NameError(
             "{} is not defined. Please select from {}".format(
@@ -441,10 +457,6 @@ def SSD512(input_shape, n_classes, basenet_name,
     network["block4_norm"] = L2Normalization(20,
                                              name="block4_norm"
                                              )(network["block4_conv3"])
-
-    feature_layers = ["block4_norm", "block7_conv", "block8_conv2",
-                      "block9_conv2", "block10_conv2", "block11_conv2",
-                      "block12_conv2"]
 
     bboxes = list()
     list_loc_layers = list()
