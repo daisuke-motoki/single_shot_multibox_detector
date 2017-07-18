@@ -164,12 +164,12 @@ class SingleShotMultiBoxDetector:
         # def schedule(epoch, decay=0.9):
         #     return learning_rate * decay**(epoch)
         # callbacks.append(keras.callbacks.LearningRateScheduler(schedule))
-        # optim = keras.optimizers.SGD(
-        #     lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
-        # )
 
         if optimizer is None:
-            optim = keras.optimizers.Adam(lr=learning_rate)
+            # optim = keras.optimizers.Adam(lr=learning_rate)
+            optim = keras.optimizers.SGD(
+                lr=learning_rate, momentum=0.9, decay=0.0005, nesterov=True
+            )
         else:
             optim = optimizer
 
