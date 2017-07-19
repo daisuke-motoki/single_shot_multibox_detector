@@ -78,9 +78,11 @@ if __name__ == "__main__":
         "weights.{epoch:02d}-{val_loss:.2f}.hdf5"
     ))
     freeze = ["input_1",
-              "block1_conv1", "block1_conv2", "block1_pool",
-              "block2_conv1", "block2_conv2", "block2_pool",
-              "block3_conv1", "block3_conv2", "block3_conv3", "block3_pool",
+              "block1_conv1", "block1_conv2",
+              "block2_conv1", "block2_conv2",
+              "block3_conv1", "block3_conv2", "block3_conv3",
+              "block4_conv1", "block4_conv2", "block4_conv3",
+              "block5_conv1", "block5_conv2", "block5_conv3",
               ]
     ssd.save_parameters("./checkpoints/ssd300_voc2007_params.json")
     ssd.train_by_generator(gen,
