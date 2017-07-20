@@ -40,6 +40,7 @@ if __name__ == "__main__":
     ssd = SingleShotMultiBoxDetector(model_type="ssd512",
                                      base_net="vgg16",
                                      n_classes=n_classes,
+                                     class_names=labels,
                                      input_shape=input_shape,
                                      aspect_ratios=aspect_ratios,
                                      scales=scales,
