@@ -18,7 +18,7 @@ if __name__ == "__main__":
               "sheep", "sofa",
               "train", "tvmonitor"]
     n_classes = len(labels)
-    input_shape = (300, 300, 3)
+    input_shape = (512, 512, 3)
 
     aspect_ratios = [[2., 1/2.],
                      [2., 1/2., 3., 1/3.],
@@ -35,8 +35,8 @@ if __name__ == "__main__":
     variances = [0.1, 0.1, 0.2, 0.2]
 
     # create network
-    ssd = SingleShotMultiBoxDetector(model_type="ssd300",
-                                     base_net="vgg16",
+    ssd = SingleShotMultiBoxDetector(model_type="ssd512",
+                                     base_net="resnet50",
                                      n_classes=n_classes,
                                      class_names=labels,
                                      input_shape=input_shape,
@@ -75,17 +75,46 @@ if __name__ == "__main__":
 
     # training
     path_to_checkpoints = os.sep.join((
-        "./checkpoints",
+        "./checkpoints/ssd512res_voc2007",
         "weights.{epoch:02d}-{val_loss:.2f}.hdf5"
     ))
-    freeze = ["input_1",
-              "block1_conv1", "block1_conv2",
-              "block2_conv1", "block2_conv2",
-              "block3_conv1", "block3_conv2", "block3_conv3",
-              "block4_conv1", "block4_conv2", "block4_conv3",
-              "block5_conv1", "block5_conv2", "block5_conv3",
+    freeze = [
+        'input_1',
+        'conv1', 'bn_conv1',
+        'res2a_branch2a', 'bn2a_branch2a', 'res2a_branch2b', 'bn2a_branch2b',
+        'res2a_branch2c', 'res2a_branch1', 'bn2a_branch2c', 'bn2a_branch1',
+        'res2b_branch2a', 'bn2b_branch2a', 'res2b_branch2b', 'bn2b_branch2b',
+        'res2b_branch2c', 'bn2b_branch2c',
+        'res2c_branch2a', 'bn2c_branch2a', 'res2c_branch2b', 'bn2c_branch2b',
+        'res2c_branch2c', 'bn2c_branch2c',
+        'res3a_branch2a', 'bn3a_branch2a', 'res3a_branch2b', 'bn3a_branch2b',
+        'res3a_branch2c', 'res3a_branch1', 'bn3a_branch2c', 'bn3a_branch1',
+        'res3b_branch2a', 'bn3b_branch2a', 'res3b_branch2b', 'bn3b_branch2b',
+        'res3b_branch2c', 'bn3b_branch2c',
+        'res3c_branch2a', 'bn3c_branch2a', 'res3c_branch2b', 'bn3c_branch2b',
+        'res3c_branch2c', 'bn3c_branch2c',
+        'res3d_branch2a', 'bn3d_branch2a', 'res3d_branch2b', 'bn3d_branch2b',
+        'res3d_branch2c', 'bn3d_branch2c',
+        'res4a_branch2a', 'bn4a_branch2a', 'res4a_branch2b', 'bn4a_branch2b',
+        'res4a_branch2c', 'res4a_branch1', 'bn4a_branch2c', 'bn4a_branch1',
+        'res4b_branch2a', 'bn4b_branch2a', 'res4b_branch2b', 'bn4b_branch2b',
+        'res4b_branch2c', 'bn4b_branch2c',
+        'res4c_branch2a', 'bn4c_branch2a', 'res4c_branch2b', 'bn4c_branch2b',
+        'res4c_branch2c', 'bn4c_branch2c',
+        'res4d_branch2a', 'bn4d_branch2a', 'res4d_branch2b', 'bn4d_branch2b',
+        'res4d_branch2c', 'bn4d_branch2c',
+        'res4e_branch2a', 'bn4e_branch2a', 'res4e_branch2b', 'bn4e_branch2b',
+        'res4e_branch2c', 'bn4e_branch2c',
+        'res4f_branch2a', 'bn4f_branch2a', 'res4f_branch2b', 'bn4f_branch2b',
+        'res4f_branch2c', 'bn4f_branch2c',
+        'res5a_branch2a', 'bn5a_branch2a', 'res5a_branch2b', 'bn5a_branch2b',
+        'res5a_branch2c', 'res5a_branch1', 'bn5a_branch2c', 'bn5a_branch1',
+        'res5b_branch2a', 'bn5b_branch2a', 'res5b_branch2b', 'bn5b_branch2b',
+        'res5b_branch2c', 'bn5b_branch2c',
+        'res5c_branch2a', 'bn5c_branch2a', 'res5c_branch2b', 'bn5c_branch2b',
+        'res5c_branch2c', 'bn5c_branch2c',
               ]
-    ssd.save_parameters("./checkpoints/ssd300_voc2007_params.json")
+    ssd.save_parameters("./checkpoints/ssd512res_voc2007/ssd512res_voc2007_params.json")
     ssd.train_by_generator(gen,
                            epoch=30,
                            learning_rate=1e-3,

@@ -2,7 +2,8 @@ import json
 import keras
 from keras.applications.imagenet_utils import preprocess_input
 from ssd.models import SSD300_vgg16, SSD512_vgg16
-from ssd.models import SSD300_resnet50
+from ssd.models import SSD300_resnet50, SSD512_resnet50
+from ssd.models import SSD300_xception
 from ssd.losses import MultiBoxLoss
 from ssd.utils import BoundaryBox
 
@@ -11,7 +12,7 @@ class SingleShotMultiBoxDetector:
     """
     """
     available_type = ["ssd300", "ssd512"]
-    available_net = ["vgg16", "resnet50"]
+    available_net = ["vgg16", "resnet50", "xception"]
 
     ar_presets = dict(
         ssd300=[[2., 1/2.],
@@ -100,11 +101,21 @@ class SingleShotMultiBoxDetector:
                                                  self.n_classes,
                                                  self.aspect_ratios,
                                                  self.scales)
+        elif self.model_type == "ssd300" and self.base_net == "xception":
+            self.model, priors = SSD300_xception(self.input_shape,
+                                                 self.n_classes,
+                                                 self.aspect_ratios,
+                                                 self.scales)
         elif self.model_type == "ssd512" and self.base_net == "vgg16":
             self.model, priors = SSD512_vgg16(self.input_shape,
                                               self.n_classes,
                                               self.aspect_ratios,
                                               self.scales)
+        elif self.model_type == "ssd512" and self.base_net == "resnet50":
+            self.model, priors = SSD512_resnet50(self.input_shape,
+                                                 self.n_classes,
+                                                 self.aspect_ratios,
+                                                 self.scales)
         else:
             raise NameError(
                 "{},{} is not defined. types are {}, basenets are {}.".format(
@@ -130,6 +141,13 @@ class SingleShotMultiBoxDetector:
                 weights_path = keras_resnet50.get_file(
                     'resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5',
                     keras_resnet50.WEIGHTS_PATH_NO_TOP,
+                    cache_subdir="models"
+                )
+            elif self.base_net == "xception":
+                import keras.applications.xception as keras_xception
+                weights_path = keras_xception.get_file(
+                    'xception_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                    keras_xception.TF_WEIGHTS_PATH_NO_TOP,
                     cache_subdir="models"
                 )
             else:
