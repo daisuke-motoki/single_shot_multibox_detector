@@ -2,7 +2,6 @@ import os
 import pickle
 import numpy as np
 from scipy.misc import imread, imresize
-from keras.applications.imagenet_utils import preprocess_input
 from ssd.ssd import SingleShotMultiBoxDetector
 import imageio
 from PIL import Image, ImageDraw, ImageFont
@@ -60,7 +59,7 @@ class Video(object):
             input_image = np.concatenate([input_image, alpha255], axis=2)
             base = Image.fromarray(input_image).convert("RGBA")
 
-            x = preprocess_input(np.array([resized_image]))
+            x = np.array([resized_image])
             results = self.ssd.detect(x, confidence_threshold=conf_thresh)
             if len(results) > 0 and len(results[0]) > 0:
                 det_label = results[0][:, 0]
