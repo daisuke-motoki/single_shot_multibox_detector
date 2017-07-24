@@ -1,9 +1,8 @@
 import os
 import numpy as np
-from scipy.misc import imread
 from scipy.misc import imresize
 from random import shuffle
-from keras.applications.imagenet_utils import preprocess_input
+from keras.preprocessing import image
 
 
 class Generator(object):
@@ -137,7 +136,7 @@ class Generator(object):
         new_targets = np.asarray(new_targets).reshape(-1, targets.shape[1])
         return img, new_targets
 
-    def generate(self, train=True):
+    def generate(self, preprocesser, train=True):
         while True:
             if train:
                 shuffle(self.train_keys)
@@ -159,7 +158,8 @@ class Generator(object):
                     img_path = img_path + ".png"
                 else:
                     raise NameError()
-                img = imread(img_path).astype('float32')
+                img = image.load_img(img_path)
+                img = image.img_to_array(img)
                 y = self.gt[key].copy()
 
                 if train and self.do_crop:
@@ -183,4 +183,4 @@ class Generator(object):
                     tmp_targets = np.array(targets)
                     inputs = []
                     targets = []
-                    yield preprocess_input(tmp_inp), tmp_targets
+                    yield preprocesser(tmp_inp), tmp_targets

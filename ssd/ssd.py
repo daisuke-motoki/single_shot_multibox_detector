@@ -1,6 +1,5 @@
 import json
 import keras
-from keras.applications.imagenet_utils import preprocess_input
 from ssd.models import SSD300_vgg16, SSD512_vgg16
 from ssd.models import SSD300_resnet50, SSD512_resnet50
 from ssd.models import SSD300_xception
@@ -83,6 +82,16 @@ class SingleShotMultiBoxDetector:
         self.max_output_size = max_output_size
         self.model_type = model_type
         self.base_net = base_net
+        self.preprocesser = None
+        if base_net == "vgg16":
+            from keras.applications.vgg16 import preprocess_input
+        elif base_net == "resnet50":
+            from keras.applications.resnet50 import preprocess_input
+        elif base_net == "xception":
+            from keras.applications.xception import preprocess_input
+        else:
+            raise TypeError("Unknown base net name.")
+        self.preprocesser = preprocess_input
 
         self.model = None
         self.bboxes = None
@@ -213,12 +222,12 @@ class SingleShotMultiBoxDetector:
             ).compute_loss
         )
         history = self.model.fit_generator(
-            gen.generate(True),
+            gen.generate(self.preprocesser, True),
             int(gen.train_batches/gen.batch_size),
             epochs=epoch,
             verbose=1,
             callbacks=callbacks,
-            validation_data=gen.generate(False),
+            validation_data=gen.generate(self.preprocesser, False),
             validation_steps=int(gen.val_batches/gen.batch_size),
             workers=1
         )
@@ -261,9 +270,11 @@ class SingleShotMultiBoxDetector:
         """
         """
         if do_preprocess:
-            X = preprocess_input(X)
+            inputs = self.preprocesser(X.copy())
+        else:
+            inputs = X.copy()
 
-        predictions = self.model.predict(X,
+        predictions = self.model.predict(inputs,
                                          batch_size=batch_size,
                                          verbose=verbose)
         detections = self.bboxes.detection_out(
